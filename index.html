@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meeting Summarizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      background: #f0f2f5;
+      color: #1f2328;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1f2328;
+      letter-spacing: -0.5px;
+    }
+    header p {
+      margin-top: 8px;
+      color: #57606a;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 24px;
+    }
+
+    /* ── Drop zone ── */
+    #drop-zone {
+      border: 2px dashed #d0d7de;
+      border-radius: 10px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    #drop-zone.dragover {
+      border-color: #3b82d4;
+      background: #f0f6ff;
+    }
+    #drop-zone svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      stroke: #57606a;
+    }
+    #drop-zone p {
+      color: #57606a;
+      font-size: 0.95rem;
+    }
+    #drop-zone strong {
+      color: #3b82d4;
+    }
+    #file-input { display: none; }
+
+    #file-info {
+      margin-top: 14px;
+      font-size: 0.88rem;
+      color: #57606a;
+      min-height: 20px;
+    }
+
+    /* ── Button ── */
+    #upload-btn {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 13px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: #3b82d4;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #upload-btn:hover:not(:disabled) { background: #2563c0; }
+    #upload-btn:disabled { background: #9cb8e8; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    #progress-wrap {
+      display: none;
+      margin-top: 20px;
+    }
+    #progress-label {
+      font-size: 0.88rem;
+      color: #57606a;
+      margin-bottom: 6px;
+    }
+    #progress-bar-track {
+      background: #e5e7eb;
+      border-radius: 999px;
+      height: 8px;
+      overflow: hidden;
+    }
+    #progress-bar-fill {
+      height: 100%;
+      background: #3b82d4;
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    /* ── Error ── */
+    #error-box {
+      display: none;
+      margin-top: 18px;
+      padding: 12px 16px;
+      background: #fff5f5;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      color: #b91c1c;
+      font-size: 0.9rem;
+    }
+
+    /* ── Results ── */
+    #results { display: none; }
+
+    .result-section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #1f2328;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-summary { background: #dbeafe; color: #1d4ed8; }
+    .badge-transcript { background: #f0fdf4; color: #15803d; }
+
+    .result-box {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: #1f2328;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 24px 0;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      font-size: 0.85rem;
+      color: #57606a;
+    }
+    .meta-item strong {
+      color: #1f2328;
+    }
+
+    /* ── Copy button ── */
+    .copy-btn {
+      margin-top: 10px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #57606a;
+      background: #f7f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #e5e7eb; }
+
+    /* ── Reset ── */
+    #reset-btn {
+      display: block;
+      margin: 8px auto 0;
+      padding: 10px 28px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #3b82d4;
+      background: #fff;
+      border: 2px solid #3b82d4;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #reset-btn:hover { background: #f0f6ff; }
+
+    footer {
+      margin-top: 40px;
+      font-size: 0.75rem;
+      color: #8c959f;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 16px;
+      width: 100%;
+      max-width: 720px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎙 Meeting Summarizer</h1>
+  <p>Upload a meeting video or audio file — get a transcript and AI-generated summary instantly.</p>
+</header>
+
+<!-- Upload Card -->
+<div class="card" id="upload-card">
+  <div id="drop-zone" role="button" tabindex="0" aria-label="Upload meeting file">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 16.5v1A2.5 2.5 0 0 0 6.5 20h11A2.5 2.5 0 0 0 20 17.5v-1"/>
+      <polyline points="12 3 12 15"/>
+      <polyline points="8 7 12 3 16 7"/>
+    </svg>
+    <p><strong>Click to browse</strong> or drag &amp; drop your file here</p>
+    <p style="margin-top:6px; font-size:0.82rem;">MP4, AVI, MOV, MKV, WebM, MP3, WAV, M4A &mdash; up to 500 MB</p>
+    <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv,.webm,.mp3,.wav,.m4a" />
+  </div>
+
+  <div id="file-info"></div>
+
+  <button id="upload-btn" disabled>Generate Summary</button>
+
+  <div id="progress-wrap">
+    <div id="progress-label">Uploading &amp; processing — this may take a few minutes…</div>
+    <div id="progress-bar-track"><div id="progress-bar-fill"></div></div>
+  </div>
+
+  <div id="error-box" role="alert"></div>
+</div>
+
+<!-- Results Card -->
+<div class="card" id="results">
+  <div class="meta-row">
+    <div class="meta-item">📄 File: <strong id="meta-filename">—</strong></div>
+    <div class="meta-item">⏱ Duration: <strong id="meta-duration">—</strong></div>
+    <div class="meta-item">📝 Words: <strong id="meta-words">—</strong></div>
+  </div>
+
+  <div class="result-section">
+    <h2><span class="badge badge-summary">Summary</span> AI-Generated Meeting Summary</h2>
+    <div class="result-box" id="summary-box"></div>
+    <button class="copy-btn" data-target="summary-box">Copy Summary</button>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="result-section">
+    <h2><span class="badge badge-transcript">Transcript</span> Full Transcript</h2>
+    <div class="result-box" id="transcript-box"></div>
+    <button class="copy-btn" data-target="transcript-box">Copy Transcript</button>
+  </div>
+
+  <hr class="divider" />
+  <button id="reset-btn">↩ Summarize Another Meeting</button>
+</div>
+
+
+<script>
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const fileInfo   = document.getElementById('file-info');
+  const uploadBtn  = document.getElementById('upload-btn');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressFill = document.getElementById('progress-bar-fill');
+  const progressLabel = document.getElementById('progress-label');
+  const errorBox   = document.getElementById('error-box');
+  const results    = document.getElementById('results');
+  const uploadCard = document.getElementById('upload-card');
+  const resetBtn   = document.getElementById('reset-btn');
+
+  let selectedFile = null;
+
+  // ── File selection ──────────────────────────────────────────────────────────
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    const mb = (file.size / 1024 / 1024).toFixed(2);
+    fileInfo.textContent = `Selected: ${file.name}  (${mb} MB)`;
+    uploadBtn.disabled = false;
+    hideError();
+  }
+
+  // ── Upload & process ────────────────────────────────────────────────────────
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    startProgress();
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      // Animate the progress bar while waiting (indeterminate)
+      let pct = 10;
+      const ticker = setInterval(() => {
+        pct = Math.min(pct + (Math.random() * 3), 88);
+        progressFill.style.width = pct + '%';
+        if (pct > 40) progressLabel.textContent = 'Transcribing audio with Whisper…';
+        if (pct > 70) progressLabel.textContent = 'Generating summary with BART…';
+      }, 800);
+
+      const resp = await fetch('/api/summarize', {
+        method: 'POST',
+        body: formData,
+      });
+
+      clearInterval(ticker);
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: 'Unexpected server error.' }));
+        throw new Error(err.detail || 'Server error');
+      }
+
+      const data = await resp.json();
+      progressFill.style.width = '100%';
+      setTimeout(() => showResults(data), 400);
+
+    } catch (err) {
+      stopProgress();
+      showError(err.message || 'Something went wrong. Please try again.');
+    }
+  });
+
+  // ── Results ─────────────────────────────────────────────────────────────────
+  function showResults(data) {
+    stopProgress();
+    uploadCard.style.display = 'none';
+    results.style.display = 'block';
+
+    document.getElementById('meta-filename').textContent  = data.filename;
+    document.getElementById('meta-duration').textContent  = data.duration_seconds
+      ? formatDuration(data.duration_seconds) : 'N/A';
+    document.getElementById('meta-words').textContent     = data.transcript.split(/\s+/).length.toLocaleString();
+    document.getElementById('summary-box').textContent    = data.summary;
+    document.getElementById('transcript-box').textContent = data.transcript;
+  }
+
+  function formatDuration(secs) {
+    const m = Math.floor(secs / 60);
+    const s = Math.round(secs % 60);
+    return `${m}m ${s}s`;
+  }
+
+  // ── Reset ────────────────────────────────────────────────────────────────────
+  resetBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    fileInfo.textContent = '';
+    uploadBtn.disabled = true;
+    results.style.display = 'none';
+    uploadCard.style.display = 'block';
+    hideError();
+  });
+
+  // ── Copy buttons ─────────────────────────────────────────────────────────────
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = document.getElementById(btn.dataset.target).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => btn.textContent = orig, 1800);
+      });
+    });
+  });
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function startProgress() {
+    uploadBtn.disabled = true;
+    progressWrap.style.display = 'block';
+    progressFill.style.width   = '5%';
+    progressLabel.textContent  = 'Uploading & processing — this may take a few minutes…';
+    hideError();
+  }
+
+  function stopProgress() {
+    progressWrap.style.display = 'none';
+    progressFill.style.width   = '0%';
+    uploadBtn.disabled = !selectedFile;
+  }
+
+  function showError(msg) {
+    errorBox.textContent    = '⚠ ' + msg;
+    errorBox.style.display  = 'block';
+  }
+
+  function hideError() {
+    errorBox.style.display = 'none';
+    errorBox.textContent   = '';
+  }
+</script>
+</body>
+</html>
